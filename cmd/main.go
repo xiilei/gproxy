@@ -27,7 +27,7 @@ func main() {
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "cacert", Usage: "specify ca cert file"},
 				cli.StringFlag{Name: "cakey", Usage: "specify ca key file"},
-				cli.StringSliceFlag{Name: "hosts", Usage: "specify hosts"},
+				cli.StringSliceFlag{Name: "host", Usage: "sign host"},
 			},
 			Action: func(ctx *cli.Context) error {
 				name := ctx.Args().First()
