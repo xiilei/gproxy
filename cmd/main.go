@@ -1,14 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/urfave/cli"
+	gp "github.com/xiilei/gproxy"
 )
 
-var logger = log.New(os.Stdout, "gproxy ", log.Lshortfile)
+var logger = log.New(os.Stdout, "[gproxy] ", log.Ltime)
 
 func main() {
 	app := cli.NewApp()
@@ -16,31 +17,18 @@ func main() {
 	app.HelpName = "gproxy"
 	app.Usage = "a simple http/https proxy"
 	app.Version = "0.1.0"
-	app.Action = func(ctx *cli.Context) error {
-		fmt.Println("hello gproxy")
-		return nil
+	app.Action = run
+	app.Flags = []cli.Flag{
+		cli.StringFlag{Name: "addr", Usage: "listen port", Value: ":8080"},
 	}
 	app.Commands = []cli.Command{
-		{
-			Name:  "cert",
-			Usage: "generate local-sign rsa cert",
-			Flags: []cli.Flag{
-				cli.StringFlag{Name: "cacert", Usage: "specify ca cert file"},
-				cli.StringFlag{Name: "cakey", Usage: "specify ca key file"},
-				cli.StringSliceFlag{Name: "host", Usage: "sign host"},
-			},
-			Action: func(ctx *cli.Context) error {
-				name := ctx.Args().First()
-				if name == "" {
-					logger.Fatalln("must specify a regular name")
-				}
-				return generateCert(
-					ctx.String("cacert"),
-					ctx.String("cakey"),
-					name, ctx.StringSlice("host"))
-			},
-			ArgsUsage: "filename",
-		},
+		certCmd,
 	}
 	app.Run(os.Args)
+}
+
+func run(ctx *cli.Context) error {
+	proxy := gp.NewProxyHandler()
+	logger.Printf("listen at %s\n", ctx.String("addr"))
+	return http.ListenAndServe(ctx.String("addr"), proxy)
 }

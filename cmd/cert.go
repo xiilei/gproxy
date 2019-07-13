@@ -10,8 +10,30 @@ import (
 	"errors"
 	"os"
 
+	"github.com/urfave/cli"
 	gp "github.com/xiilei/gproxy"
 )
+
+var certCmd = cli.Command{
+	Name:  "cert",
+	Usage: "generate local-sign rsa cert",
+	Flags: []cli.Flag{
+		cli.StringFlag{Name: "cacert", Usage: "specify ca cert file"},
+		cli.StringFlag{Name: "cakey", Usage: "specify ca key file"},
+		cli.StringSliceFlag{Name: "host", Usage: "sign host"},
+	},
+	Action: func(ctx *cli.Context) error {
+		name := ctx.Args().First()
+		if name == "" {
+			logger.Fatalln("must specify a regular name")
+		}
+		return generateCert(
+			ctx.String("cacert"),
+			ctx.String("cakey"),
+			name, ctx.StringSlice("host"))
+	},
+	ArgsUsage: "filename",
+}
 
 var errorExists = errors.New("name file exists in current dir")
 
