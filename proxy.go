@@ -10,6 +10,8 @@ import (
 	"net/http/httputil"
 )
 
+var errCert = errors.New("invail cert file or hosts")
+
 // ProxyHandler is an HTTP Proxy Handler
 type ProxyHandler struct {
 	Transport http.RoundTripper
@@ -42,7 +44,8 @@ func director(req *http.Request) {}
 
 // SetCert update certificate and hosts for tls handshake
 func (ph *ProxyHandler) SetCert(hosts []string, certFile, keyFile string) (err error) {
-	if certFile == "" || keyFile == "" {
+	if certFile == "" || keyFile == "" || len(hosts) == 0 {
+		return errCert
 	}
 	certificates := make([]tls.Certificate, 1)
 	certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
@@ -56,6 +59,8 @@ func (ph *ProxyHandler) SetCert(hosts []string, certFile, keyFile string) (err e
 		ClientSessionCache:       tls.NewLRUClientSessionCache(16),
 		SessionTicketsDisabled:   false,
 		Renegotiation:            tls.RenegotiateNever,
+		// @TODO 两边协商一致
+		NextProtos: []string{"http/1.1", "h2"},
 	}
 	ph.hosts = hosts
 	return
