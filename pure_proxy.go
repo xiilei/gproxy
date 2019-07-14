@@ -1,6 +1,8 @@
 package gproxy
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -11,17 +13,12 @@ import (
 // PureProxy is a tcp proxy handler http requests
 // 最单纯的http代理,只转发几乎不处理任何数据
 type PureProxy struct {
-	inShutdown int32
-	mu         sync.Mutex
-	activeConn map[*conn]struct{}
-	doneChan   chan struct{}
-	listener   *net.Listener
-}
-
-type conn struct {
-	server     *PureProxy
-	rwc        net.Conn
-	remoteAddr string
+	inShutdown  int32
+	mu          sync.Mutex
+	activeConn  map[*conn]struct{}
+	doneChan    chan struct{}
+	listener    *net.Listener
+	ReadTimeout time.Duration
 }
 
 type tcpKeepAliveListener struct {
@@ -50,6 +47,13 @@ func (oc *onceCloseListener) Close() error {
 }
 
 func (oc *onceCloseListener) close() { oc.closeErr = oc.Listener.Close() }
+
+type badStringError struct {
+	what string
+	str  string
+}
+
+func (e *badStringError) Error() string { return fmt.Sprintf("%s %q", e.what, e.str) }
 
 // ListenAndServe listens on the TCP network address srv.Addr and then
 // handle requests on incoming connections.
@@ -86,10 +90,7 @@ func (p *PureProxy) closeDoneChanLocked() {
 	ch := p.getDoneChanLocked()
 	select {
 	case <-ch:
-		// Already closed. Don't close again.
 	default:
-		// Safe to close here. We're the only closer, guarded
-		// by s.mu.
 		close(ch)
 	}
 }
@@ -112,6 +113,7 @@ func (p *PureProxy) serve(l net.Listener) error {
 	defer l.Close()
 	p.listener = &l
 	var tempDelay time.Duration
+	ctx := context.Background()
 	for {
 		rw, e := l.Accept()
 		if e != nil {
@@ -140,12 +142,9 @@ func (p *PureProxy) serve(l net.Listener) error {
 			server: p,
 			rwc:    rw,
 		}
-		go p.handleConn(c)
+		p.trackConn(c, true)
+		go c.serve(ctx)
 	}
-}
-
-func (p *PureProxy) handleConn(c *conn) {
-
 }
 
 // copy from net/http/server.go
@@ -164,4 +163,42 @@ func (p *PureProxy) trackConn(c *conn, add bool) {
 
 func (p *PureProxy) shuttingDown() bool {
 	return atomic.LoadInt32(&p.inShutdown) != 0
+}
+
+type conn struct {
+	server     *PureProxy
+	rwc        net.Conn
+	remoteAddr string
+}
+
+func (c *conn) serve(ctx context.Context) {
+	c.remoteAddr = c.rwc.RemoteAddr().String()
+	ctx, cancel := context.WithCancel(ctx)
+	c.handleHost(ctx)
+	cancel()
+}
+
+func (c *conn) close() {
+	c.rwc.Close()
+}
+
+func (c *conn) handleHost(ctx context.Context) (host string, err error) {
+	if d := c.server.ReadTimeout; d != 0 {
+		deadline := time.Now().Add(d)
+		c.rwc.SetReadDeadline(deadline)
+	}
+
+	// @TODO, 处理 maxHeaderBytes 1 << 20 + 4096
+
+	br := newBufioReader(c.rwc)
+	defer func() {
+		c.close()
+		c.server.trackConn(c, false)
+		putBufioReader(br)
+	}()
+
+	// http1.1
+	method, err := br.ReadBytes(byte(' '))
+	fmt.Printf("%s", method)
+	return
 }

@@ -23,6 +23,7 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		certCmd,
+		pureCmd,
 	}
 	app.Run(os.Args)
 }

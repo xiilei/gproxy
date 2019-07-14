@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"sync"
+	"time"
 )
 
 var errCert = errors.New("invail cert file or hosts")
@@ -21,22 +23,43 @@ type ProxyHandler struct {
 	// 用来处理http
 	Handler http.Handler
 	hosts   []string
+	mu      sync.Mutex
 }
 
 // NewProxyHandler returns a new ProxyHandler
 func NewProxyHandler() *ProxyHandler {
-	pool := NewBufferPool()
+	var tp = defaultTransport()
 	// ReverseProxy 已经足够用来代理普通http
 	rp := &httputil.ReverseProxy{
-		Transport:  http.DefaultTransport,
-		BufferPool: pool,
+		Transport:  tp,
+		BufferPool: defaultBufferPool,
 		ErrorLog:   logger,
 		Director:   director,
 	}
 	return &ProxyHandler{
-		Transport:  http.DefaultTransport,
+		Transport:  tp,
 		Handler:    rp,
-		BufferPool: pool,
+		BufferPool: defaultBufferPool,
+	}
+}
+
+// 先固定是10s
+var dialer = &net.Dialer{
+	Timeout:   10 * time.Second,
+	KeepAlive: 30 * time.Second,
+	DualStack: true,
+}
+
+// http.DefaultTransport
+func defaultTransport() http.RoundTripper {
+	return &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           dialer.DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		// @TODO DialTLS 并行Handshake加快首次连接速度 (但需要配置h2)
 	}
 }
 
@@ -52,6 +75,7 @@ func (ph *ProxyHandler) SetCert(hosts []string, certFile, keyFile string) (err e
 	if err != nil {
 		return
 	}
+	ph.mu.Lock()
 	ph.TLSConfig = &tls.Config{
 		MinVersion:               tls.VersionTLS12,
 		Certificates:             certificates,
@@ -63,6 +87,7 @@ func (ph *ProxyHandler) SetCert(hosts []string, certFile, keyFile string) (err e
 		NextProtos: []string{"http/1.1", "h2"},
 	}
 	ph.hosts = hosts
+	ph.mu.Unlock()
 	return
 }
 
@@ -117,7 +142,7 @@ func (ph *ProxyHandler) connect(rw http.ResponseWriter, req *http.Request) {
 // 直接转发的 tls 连接
 func (ph *ProxyHandler) tunnel(addr string, conn net.Conn) {
 	logger.Printf("connect tunnel %s \n", addr)
-	backend, err := net.Dial("tcp", addr)
+	backend, err := dialer.Dial("tcp", addr)
 	if err != nil {
 		httpError(conn, err)
 		return
