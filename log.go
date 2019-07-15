@@ -5,4 +5,4 @@ import (
 	"os"
 )
 
-var logger = log.New(os.Stdout, "[gproxy] ", log.LstdFlags|log.Lshortfile)
+var logger = log.New(os.Stdout, "[gproxy] ", log.Ltime|log.Lshortfile)
