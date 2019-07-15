@@ -168,9 +168,35 @@ func (ph *ProxyHandler) tunnel(addr string, conn net.Conn) {
 	}
 }
 
-// 参与握手的 tls 连接
+// 参与握手的 tls 连接,这里先简单处理
 func (ph *ProxyHandler) tls(addr string, conn net.Conn) {
-	httpError(conn, errors.New("not support yet"))
+	srv := tls.Server(conn, ph.TLSConfig)
+	br := newBufioReader(srv)
+	defer func() {
+		srv.Close()
+		putBufioReader(br)
+	}()
+
+	// @TODO,并行 tls handshake
+	// @TODO,tcp tunnel,解析copy不阻碍速度io.MultiWriter
+	// @TODO,两端h2协商不一致问题
+	req, err := http.ReadRequest(br)
+	if err != nil {
+		httpError(srv, err)
+		return
+	}
+	req.URL.Host = addr
+	req.URL.Scheme = "https"
+	// 因为第一次到这里需要等待两次握手时间,
+	// transport还没有加入到connections pool,会很慢
+	res, err := ph.Transport.RoundTrip(req)
+	if err != nil {
+		httpError(srv, err)
+		return
+	}
+	defer res.Body.Close()
+	logger.Printf("%s %s %d\n", req.Method, req.URL, res.StatusCode)
+	res.Write(srv)
 }
 
 func httpError(w io.WriteCloser, err error) {

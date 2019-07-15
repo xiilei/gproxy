@@ -28,6 +28,15 @@ go build -o gproxy
 
 ```bash
 
-cmd/gproxy
+# proxy 
+./gproxy
+
+# https (参与握手) proxy
+# 创建证书
+./gproxy cert -host letsencrypt.org test
+./gproxy -host letsencrypt.org -key test.ket -cert test.cert
+
+# test
+curl --cacert ./test-ca.cert -v --proxy http://127.0.0.1:8080  https://letsencrypt.org/test
 
 ```

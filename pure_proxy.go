@@ -69,7 +69,7 @@ func (p *PureProxy) ListenAndServe(addr string) error {
 	return nil
 }
 
-// Close immediately closes all active net.Listeners
+// Close immediately closes all connections
 func (p *PureProxy) Close() (err error) {
 	atomic.StoreInt32(&p.inShutdown, 1)
 	p.mu.Lock()
@@ -96,8 +96,8 @@ func (p *PureProxy) closeDoneChanLocked() {
 }
 
 func (p *PureProxy) getDoneChan() <-chan struct{} {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	// p.mu.Lock()
+	// defer p.mu.Unlock()
 	return p.getDoneChanLocked()
 }
 
@@ -174,14 +174,19 @@ type conn struct {
 func (c *conn) serve(ctx context.Context) {
 	c.remoteAddr = c.rwc.RemoteAddr().String()
 	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		c.close()
+		c.server.trackConn(c, false)
+		cancel()
+	}()
 	c.handleHost(ctx)
-	cancel()
 }
 
 func (c *conn) close() {
 	c.rwc.Close()
 }
 
+// Host: example.com / Method
 func (c *conn) handleHost(ctx context.Context) (host string, err error) {
 	if d := c.server.ReadTimeout; d != 0 {
 		deadline := time.Now().Add(d)
@@ -189,11 +194,8 @@ func (c *conn) handleHost(ctx context.Context) (host string, err error) {
 	}
 
 	// @TODO, 处理 maxHeaderBytes 1 << 20 + 4096
-
 	br := newBufioReader(c.rwc)
 	defer func() {
-		c.close()
-		c.server.trackConn(c, false)
 		putBufioReader(br)
 	}()
 
