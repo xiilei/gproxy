@@ -8,11 +8,14 @@ http/https 调试工具,可以用来取代 Charles
 - [ ] https rootca
 - [ ] request/response filter
 - [ ] 请求录制和重放
+- [ ] snapshot 快照
 - [ ] 限速,模拟2G/3G/4G
 - [ ] load-balancing(可用于反向代理) 
 - [ ] websocket frames
 - [ ] h2 stream view
 - [ ] socks5
+- [ ] webui [anyproxy-ui](https://github.com/alibaba/anyproxy/tree/master/web) [devtools-frontend](https://github.com/ChromeDevTools/devtools-frontend)
+- [ ] local agent proxy(通过pure proxy可以支持pac)
 
 ## Build from source
 
