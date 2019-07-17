@@ -26,7 +26,7 @@ var (
 )
 
 // PureProxy is a tcp proxy handler http requests
-// 最单纯的http代理,只转发几乎不处理任何数据
+// 最单纯的http代理,只读取代理需要处理的数据,其他直接转发
 type PureProxy struct {
 	inShutdown  int32
 	mu          sync.Mutex
@@ -233,11 +233,14 @@ func readToend(c net.Conn) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("line:%s %d\n", line, len(line))
-		if len(line) == 2 {
+		if isEndLine(line) {
 			return nil
 		}
 	}
+}
+
+func isEndLine(line []byte) bool {
+	return len(line) == 2 && line[0] == '\r' && line[1] == '\n'
 }
 
 // Host: example.com / Method
@@ -276,6 +279,9 @@ func (c *conn) readHostmetaH1() ([]byte, error) {
 		total += n
 		if line, next = nextLine(cache[next:]); next == 0 {
 			continue
+		}
+		if isEndLine(line) {
+			return cache[:total], nil
 		}
 		// 读取请求第一行信息,GET / HTTP/1.1
 		if c.method == nil {
@@ -340,7 +346,19 @@ func nextLine(b []byte) ([]byte, int) {
 	if n > 0 && b[n-1] == '\r' {
 		n--
 	}
-	return b[:n], nNext + 1
+	return trim(b[:n]), nNext + 1
+}
+
+func trim(s []byte) []byte {
+	i := 0
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	n := len(s)
+	for n > i && (s[n-1] == ' ' || s[n-1] == '\t') {
+		n--
+	}
+	return s[i:n]
 }
 
 func skipDelimiter(buf []byte, n int) []byte {
