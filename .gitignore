@@ -15,3 +15,4 @@
 
 *.key
 *.cert
+.vscode

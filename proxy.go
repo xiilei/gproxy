@@ -149,23 +149,27 @@ func (ph *ProxyHandler) tunnel(addr string, conn net.Conn) {
 	}
 	buf := ph.BufferPool.Get()
 	defer func() {
+		// 这里可能导致关闭两次
 		conn.Close()
 		backend.Close()
 		ph.BufferPool.Put(buf)
 	}()
+	err = tunnel(conn, backend, buf)
+	if err != nil {
+		httpError(conn, err)
+	}
+}
 
+func tunnel(user, backend net.Conn, buf []byte) error {
 	errc := make(chan error, 1)
 	spc := copier{
-		user:    conn,
+		user:    user,
 		backend: backend,
 		buf:     buf,
 	}
 	go spc.copyToBackend(errc)
 	go spc.copyFromBackend(errc)
-	err = <-errc
-	if err != nil {
-		httpError(conn, err)
-	}
+	return <-errc
 }
 
 // http1.1 参与握手的 tls 连接,这里先简单处理
@@ -204,7 +208,7 @@ func (ph *ProxyHandler) tls(addr string, conn net.Conn) {
 func httpError(w io.WriteCloser, err error) {
 	logger.Println("http error:", err)
 	io.WriteString(w, "HTTP/1.1 502 Bad Gateway\r\n\r\n")
-	w.Close()
+	// w.Close()
 }
 
 type copier struct {

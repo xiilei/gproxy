@@ -42,4 +42,8 @@ go build -o gproxy
 # test
 curl --cacert ./test-ca.cert -v --proxy http://127.0.0.1:8080  https://letsencrypt.org/test
 
+
+# 如果只是一个单纯的 http proxy (目前还不稳定)
+./gproxy pure
+
 ```
