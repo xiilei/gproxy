@@ -257,10 +257,10 @@ func (c *conn) handleHost(ctx context.Context) ([]byte, error) {
 // 需要读取 Method 和 Host, 并且返回已经读取到的 bytes
 func (c *conn) readHostmetaH1() ([]byte, error) {
 	// 一般情况下 Host 就是第二个header
-	arean := make([]byte, 20, 60)
+	arean := make([]byte, 32, 96)
 	// 已经读取到的bytes
-	cache := arean[20:]
-	buf := arean[0:20]
+	cache := arean[32:]
+	buf := arean[0:32]
 	var next, total int
 	var line []byte
 	for {

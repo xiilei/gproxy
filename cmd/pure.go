@@ -18,7 +18,7 @@ var pureCmd = cli.Command{
 }
 
 func pureRun(addr string) error {
-	p := &gp.PureProxy{}
+	p := gp.PureProxy{}
 	logger.Printf("listen at %s\n", addr)
 	return p.ListenAndServe(addr)
 }

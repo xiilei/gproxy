@@ -16,3 +16,5 @@
 *.key
 *.cert
 .vscode
+cmd/cmd
+cmd/gproxy
