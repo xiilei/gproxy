@@ -2,7 +2,6 @@ package gproxy
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -128,7 +127,6 @@ func (p *PureProxy) serve(l net.Listener) error {
 	defer l.Close()
 	p.listener = &l
 	var tempDelay time.Duration
-	ctx := context.Background()
 	for {
 		rw, e := l.Accept()
 		if e != nil {
@@ -158,7 +156,7 @@ func (p *PureProxy) serve(l net.Listener) error {
 			rwc:    rw,
 		}
 		p.trackConn(c, true)
-		go c.serve(ctx)
+		go c.serve()
 	}
 }
 
@@ -187,16 +185,14 @@ type conn struct {
 	isTLS                    bool
 }
 
-func (c *conn) serve(ctx context.Context) {
-	ctx, cancel := context.WithCancel(ctx)
+func (c *conn) serve() {
 	buf := defaultBufferPool.Get()
 	defer func() {
 		c.close()
 		c.server.trackConn(c, false)
 		defaultBufferPool.Put(buf)
-		cancel()
 	}()
-	cache, err := c.handleHost(ctx)
+	cache, err := c.handleHost()
 	if err != nil {
 		httpError(c.rwc, err)
 		return
@@ -245,7 +241,7 @@ func isEndLine(line []byte) bool {
 
 // Host: example.com / Method
 // 读取 Header 的 Host 和 Method 字段
-func (c *conn) handleHost(ctx context.Context) ([]byte, error) {
+func (c *conn) handleHost() ([]byte, error) {
 	if d := c.server.ReadTimeout; d != 0 {
 		deadline := time.Now().Add(d)
 		c.rwc.SetReadDeadline(deadline)
