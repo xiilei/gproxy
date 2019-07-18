@@ -25,7 +25,7 @@ type ProxyHandler struct {
 	BufferPool *BufferPool
 	// 用来处理http
 	Handler http.Handler
-	hosts   []string
+	hosts   map[string]struct{}
 	mu      sync.Mutex
 }
 
@@ -89,16 +89,19 @@ func (ph *ProxyHandler) SetCert(hosts []string, certFile, keyFile string) (err e
 		// @TODO 两边协商一致
 		NextProtos: []string{"http/1.1", "h2"},
 	}
-	ph.hosts = hosts
+	if ph.hosts == nil {
+		ph.hosts = make(map[string]struct{}, len(hosts))
+	}
+	for _, host := range hosts {
+		ph.hosts[host] = struct{}{}
+	}
 	ph.mu.Unlock()
 	return
 }
 
 func (ph *ProxyHandler) contains(host string) bool {
-	for _, n := range ph.hosts {
-		if host == n {
-			return true
-		}
+	if _, ok := ph.hosts[host]; ok {
+		return true
 	}
 	return false
 }
