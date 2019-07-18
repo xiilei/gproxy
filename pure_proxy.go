@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,6 +22,7 @@ var (
 	headerHost    = []byte("Host")
 	methodConnect = []byte("CONNECT")
 	pathRoot      = []byte("/")
+	http200       = []byte("HTTP/1.1 200 OK\r\n\r\n")
 )
 
 // PureProxy is a tcp proxy handler http requests
@@ -74,7 +74,7 @@ func (e *badStringError) Error() string { return fmt.Sprintf("%s %q", e.what, e.
 // handle requests on incoming connections.
 func (p *PureProxy) ListenAndServe(addr string) error {
 	if p.shuttingDown() {
-		return http.ErrServerClosed
+		return errServerClosed
 	}
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -134,7 +134,7 @@ func (p *PureProxy) serve(l net.Listener) error {
 		if e != nil {
 			select {
 			case <-p.getDoneChan():
-				return http.ErrServerClosed
+				return errServerClosed
 			default:
 			}
 			if ne, ok := e.(net.Error); ok && ne.Temporary() {

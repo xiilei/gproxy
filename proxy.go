@@ -12,8 +12,10 @@ import (
 	"time"
 )
 
-var errCert = errors.New("invail cert file or hosts")
-var http200 = []byte("HTTP/1.0 200 OK\r\n\r\n")
+var (
+	errCert         = errors.New("invail cert file or hosts")
+	errServerClosed = errors.New("server closed")
+)
 
 // ProxyHandler is an HTTP Proxy Handler
 type ProxyHandler struct {
