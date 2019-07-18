@@ -209,7 +209,7 @@ func (c *conn) serve(ctx context.Context) {
 	}
 	if c.isTLS {
 		readToend(c.rwc)
-		c.rwc.Write([]byte("HTTP/1.0 200 OK\r\n\r\n"))
+		c.rwc.Write(http200)
 	} else {
 		backend.Write(cache)
 	}

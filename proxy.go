@@ -13,6 +13,7 @@ import (
 )
 
 var errCert = errors.New("invail cert file or hosts")
+var http200 = []byte("HTTP/1.0 200 OK\r\n\r\n")
 
 // ProxyHandler is an HTTP Proxy Handler
 type ProxyHandler struct {
@@ -131,7 +132,7 @@ func (ph *ProxyHandler) connect(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	addr := host + ":" + port
-	conn.Write([]byte("HTTP/1.0 200 OK\r\n\r\n"))
+	conn.Write(http200)
 	if ph.contains(host) {
 		ph.tls(addr, conn)
 	} else {
